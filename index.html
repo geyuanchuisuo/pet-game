@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>桌面宠物 · 一个不太负责任的饲养游戏</title>
+<style>
+:root{
+  --ink:#2B3742; --ink2:#5A6B7A; --ink3:#8C9AA6;
+  --wall:#F7F2E8; --floor:#E9D9C0; --base:#DBC7A4;
+  --accent:#E8963C; --accent-d:#C97A22;
+  --good:#2F9E75; --bad:#C8523F; --sad:#7A8CA3;
+  --line:#E3E8ED; --card:#FFFFFF;
+  --shadow:0 12px 34px rgba(40,55,70,.16);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#EDEFF2; color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+}
+#wrap{position:relative;width:720px;height:480px}
+#stage{
+  position:absolute;top:0;left:0;width:720px;height:480px;
+  transform-origin:0 0; border-radius:20px; overflow:hidden;
+  background:var(--wall); box-shadow:var(--shadow); user-select:none;
+}
+.layer{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column}
+.layer.on{display:flex}
+
+/* ---------- buttons ---------- */
+.btn{
+  border:0;cursor:pointer;font:inherit;font-size:15px;font-weight:500;
+  padding:11px 22px;border-radius:12px;background:var(--line);color:var(--ink);
+  transition:transform .15s,background .15s,border-color .15s,color .15s;
+}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.primary{background:var(--accent);color:#fff;box-shadow:0 6px 16px rgba(232,150,60,.34)}
+.btn.primary:hover{background:var(--accent-d)}
+.btn.ghost{background:transparent;border:1.5px solid #D7DEE5;color:var(--ink2)}
+.btn.ghost:hover{border-color:#BAC6D2;color:var(--ink)}
+.btn.small{font-size:13px;padding:8px 16px;border-radius:10px}
+
+/* ---------- title ---------- */
+#l-title{background:linear-gradient(170deg,#FAF6EE 0%,#F1E9DA 100%)}
+.t-logo{font-size:44px;font-weight:500;letter-spacing:6px;margin-bottom:10px}
+.t-sub{font-size:14px;color:var(--ink3);letter-spacing:1px;margin-bottom:38px}
+.t-rows{display:flex;gap:12px}
+.t-can{position:absolute;right:96px;bottom:88px;opacity:.9}
+@keyframes tfloat{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-12px) rotate(-6deg)}}
+.t-can svg{animation:tfloat 3.4s ease-in-out infinite}
+
+/* ---------- select ---------- */
+#l-select{background:linear-gradient(170deg,#FAF6EE 0%,#F1E9DA 100%)}
+.s-title{font-size:24px;font-weight:500;margin-bottom:6px}
+.s-note{font-size:13px;color:var(--ink3);margin-bottom:28px}
+.s-row{display:flex;gap:22px;margin-bottom:26px}
+.pick{
+  width:168px;padding:20px 0 16px;border-radius:18px;border:1.5px solid #E4DACB;
+  background:#FFFDF9;cursor:pointer;font:inherit;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  font-size:15px;font-weight:500;transition:.18s;
+}
+.pick:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 12px 26px rgba(200,170,120,.28)}
+.pick span{color:var(--ink2)}
+.pick:hover span{color:var(--ink)}
+
+/* ---------- room ---------- */
+#l-room{display:none}
+#l-room.on{display:block}
+.room{position:absolute;inset:0;overflow:hidden}
+.wall{position:absolute;left:0;right:0;top:0;height:300px;background:var(--wall)}
+.wall::after{
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(120% 90% at 22% 8%,rgba(255,236,200,.75),rgba(255,236,200,0) 62%);
+}
+.floor{position:absolute;left:0;right:0;top:300px;bottom:0;background:var(--floor)}
+.base{position:absolute;left:0;right:0;top:290px;height:14px;background:var(--base)}
+.win{
+  position:absolute;right:64px;top:46px;width:152px;height:124px;
+  background:#CFE6F2;border:7px solid #FFF;border-radius:8px;
+  box-shadow:0 6px 18px rgba(90,120,150,.18);
+}
+.win::before,.win::after{content:"";position:absolute;background:#FFF}
+.win::before{left:50%;top:0;bottom:0;width:6px;margin-left:-3px}
+.win::after{top:50%;left:0;right:0;height:6px;margin-top:-3px}
+.sunray{
+  position:absolute;right:52px;top:44px;width:180px;height:250px;
+  background:linear-gradient(200deg,rgba(255,236,180,.55),rgba(255,236,180,0) 70%);
+  transform:rotate(16deg);pointer-events:none;
+}
+.frame{
+  position:absolute;left:76px;top:70px;width:80px;height:96px;background:#FFF;
+  border-radius:5px;box-shadow:0 6px 16px rgba(90,120,150,.16);
+  display:flex;align-items:center;justify-content:center;transform:rotate(-2deg);
+}
+.frame::after{content:"";position:absolute;inset:7px;border:2px solid #F0E4D2;border-radius:3px}
+.frame i{
+  display:block;width:34px;height:34px;border-radius:50%;
+  background:radial-gradient(circle at 34% 34%,#FBD08A,#E8963C);
+}
+.plant{position:absolute;left:64px;bottom:48px;width:54px;height:74px}
+.plant .pot{
+  position:absolute;left:11px;bottom:0;width:32px;height:26px;
+  background:#C97A52;border-radius:3px 3px 8px 8px;
+}
+.plant .pot::before{content:"";position:absolute;left:-3px;top:-3px;width:38px;height:8px;background:#B06B44;border-radius:2px}
+.plant .lf{position:absolute;bottom:24px;left:50%;width:9px;height:34px;background:#5FA363;border-radius:50% 50% 0 0/70% 70% 0 0}
+.plant .lf1{transform:translateX(-50%) rotate(-26deg)}
+.plant .lf2{transform:translateX(-50%)}
+.plant .lf3{transform:translateX(-50%) rotate(26deg)}
+.plant .lf4{height:24px;transform:translateX(-50%) rotate(-48deg)}
+.plant .lf5{height:24px;transform:translateX(-50%) rotate(48deg)}
+.plum{
+  position:absolute;right:70px;bottom:62px;font-size:11px;color:#B4805A;
+  border:1.5px dashed #D9BE9C;border-radius:8px;padding:5px 9px;background:rgba(255,255,255,.55);
+}
+
+.petwrap{
+  position:absolute;left:50%;bottom:70px;margin-left:-55px;
+  width:110px;height:176px;cursor:pointer;transition:margin-left .45s cubic-bezier(.3,1,.4,1);
+}
+.room.dual #petwrapA{margin-left:-152px}
+.room.dual #petwrapB{margin-left:42px}
+.petwrap .shadow{
+  position:absolute;left:50%;bottom:-16px;margin-left:-56px;
+  width:112px;height:20px;border-radius:50%;
+  background:rgba(140,110,70,.22);filter:blur(6px);
+}
+.pet{width:110px;height:176px;transform-origin:bottom center}
+.pet svg{display:block;width:110px;height:176px;transform-origin:bottom center;animation:bob 2.8s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.pet.noodle svg{animation:sway 3.4s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:translateY(0) rotate(-3.5deg)}50%{transform:translateY(-6px) rotate(3.5deg)}}
+.eye{transform-box:fill-box;transform-origin:center;animation:blink 5.2s infinite}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+
+.versus{
+  position:absolute;left:50%;bottom:196px;margin-left:-19px;width:38px;height:38px;
+  border-radius:50%;background:#FFF4E3;border:2px solid var(--accent);
+  align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--accent-d);
+  display:none;animation:pulse 1.5s ease-in-out infinite;pointer-events:none;
+}
+.room.dual .versus{display:flex}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.15);opacity:1}}
+
+.bubble{
+  position:absolute;left:50%;bottom:284px;transform:translate(-50%,6px);
+  background:#FFF;border-radius:12px;padding:9px 15px;font-size:13px;color:var(--ink);
+  box-shadow:0 6px 18px rgba(60,80,100,.16);white-space:nowrap;
+  opacity:0;transition:.28s;pointer-events:none;max-width:560px;
+}
+.bubble.on{opacity:1;transform:translate(-50%,0)}
+.bubble::after{
+  content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;
+  width:12px;height:12px;background:#FFF;transform:rotate(45deg);border-radius:2px;
+}
+.hud{position:absolute;left:0;right:0;bottom:20px;display:flex;justify-content:center;gap:10px}
+.hud.hide{display:none}
+
+/* ---------- modal ---------- */
+.mask{
+  position:absolute;inset:0;background:rgba(38,48,58,.42);
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px);
+}
+.mask.on{display:flex}
+.modal{
+  position:relative;width:392px;background:var(--card);border-radius:20px;
+  padding:26px 26px 22px;box-shadow:0 22px 50px rgba(30,45,60,.3);
+  animation:pop .26s cubic-bezier(.2,1.3,.5,1);
+}
+@keyframes pop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.m-x{
+  position:absolute;right:12px;top:12px;width:30px;height:30px;border:0;cursor:pointer;
+  background:transparent;border-radius:9px;font-size:19px;line-height:1;color:var(--ink3);
+  display:flex;align-items:center;justify-content:center;transition:.15s;
+}
+.m-x:hover{background:#F0F3F6;color:var(--ink)}
+.m-h{font-size:18px;font-weight:500;margin-bottom:6px}
+.m-p{font-size:13.5px;color:var(--ink3);line-height:1.6;margin-bottom:20px}
+.m-btns{display:flex;gap:10px}
+.m-btns .btn{flex:1;padding:13px 0}
+
+/* ---------- ending ---------- */
+#l-end{background:rgba(28,36,44,.88);backdrop-filter:blur(6px)}
+.e-card{
+  width:470px;background:var(--card);border-radius:22px;padding:32px 34px 26px;
+  box-shadow:0 26px 60px rgba(0,0,0,.35);animation:pop .34s cubic-bezier(.2,1.3,.5,1);
+}
+.e-tag{display:inline-block;font-size:12px;padding:4px 11px;border-radius:20px;margin-bottom:12px}
+.e-tag.good{background:#E4F5EE;color:var(--good)}
+.e-tag.bad{background:#FBEAE7;color:var(--bad)}
+.e-tag.sad{background:#EDF1F5;color:var(--sad)}
+.e-src{font-size:12.5px;color:var(--ink3);margin-bottom:6px;letter-spacing:.5px}
+.e-name{font-size:26px;font-weight:500;margin-bottom:16px;letter-spacing:1px}
+.e-text{font-size:14px;line-height:1.95;color:var(--ink2);margin-bottom:22px;max-height:212px;overflow:auto}
+.e-prog{font-size:12.5px;color:var(--ink3);margin-bottom:18px}
+.e-btns{display:flex;gap:12px}
+
+/* ---------- gallery ---------- */
+#l-gallery{background:linear-gradient(170deg,#FAF6EE 0%,#F1E9DA 100%);justify-content:flex-start;padding:34px 44px}
+.g-h{font-size:20px;font-weight:500;margin-bottom:4px}
+.g-s{font-size:12.5px;color:var(--ink3);margin-bottom:20px}
+.g-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;margin-bottom:22px}
+.g-tile{border-radius:14px;padding:12px 13px;background:#FFFDF9;border:1.5px solid #E9E0D2;min-height:76px}
+.g-tile.lock{background:#F4F1EA;border-style:dashed;border-color:#DED6C6}
+.g-tile.full{border-color:#E9B96A;background:#FFFBF2}
+.g-from{font-size:11px;color:var(--ink3);margin-bottom:4px}
+.g-name{font-size:14px;font-weight:500;line-height:1.4}
+.g-tile.lock .g-name{color:#B6AFA1;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+
+  <!-- ============ 标题 ============ -->
+  <div class="layer on" id="l-title">
+    <div class="t-logo">桌面宠物</div>
+    <div class="t-sub">一个不太负责任的饲养游戏</div>
+    <div class="t-rows">
+      <button class="btn primary" data-go="start">开 始</button>
+      <button class="btn ghost" data-go="gallery">结局图鉴</button>
+    </div>
+    <div class="t-can">
+      <svg viewBox="0 0 100 160" width="86" height="138">
+        <path d="M22 32 Q22 22 50 22 Q78 22 78 32 L78 136 Q78 150 50 150 Q22 150 22 136 Z" fill="#EEF2F6" stroke="#B7C3D0" stroke-width="2"/>
+        <path d="M22 60 h56 v50 h-56 Z" fill="#F0A03C"/>
+        <path d="M22 60 h56 v6 h-56 Z" fill="#D8871F"/>
+        <path d="M22 104 h56 v6 h-56 Z" fill="#D8871F"/>
+        <ellipse cx="50" cy="24" rx="30" ry="9" fill="#DDE5EC" stroke="#B7C3D0" stroke-width="2"/>
+        <ellipse cx="50" cy="24" rx="23" ry="6" fill="#C7D2DC"/>
+        <ellipse cx="50" cy="23" rx="7" ry="3" fill="#A9B6C3"/>
+        <circle cx="41" cy="80" r="5" fill="#fff"/><circle cx="41" cy="80" r="2.6" fill="#2B3742"/>
+        <circle cx="59" cy="80" r="5" fill="#fff"/><circle cx="59" cy="80" r="2.6" fill="#2B3742"/>
+        <path d="M44 93 Q50 99 56 93" fill="none" stroke="#2B3742" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ============ 开局选择 ============ -->
+  <div class="layer" id="l-select">
+    <div class="s-title">你想养点什么？</div>
+    <div class="s-note">选了就好好养。别后悔。</div>
+    <div class="s-row">
+      <button class="pick" data-pick="can">
+        <svg viewBox="0 0 100 160" width="60" height="96">
+          <path d="M22 32 Q22 22 50 22 Q78 22 78 32 L78 136 Q78 150 50 150 Q22 150 22 136 Z" fill="#EEF2F6" stroke="#B7C3D0" stroke-width="3"/>
+          <path d="M22 60 h56 v50 h-56 Z" fill="#F0A03C"/>
+          <ellipse cx="50" cy="24" rx="30" ry="9" fill="#DDE5EC" stroke="#B7C3D0" stroke-width="3"/>
+          <circle cx="41" cy="80" r="5.5" fill="#fff"/><circle cx="41" cy="80" r="2.8" fill="#2B3742"/>
+          <circle cx="59" cy="80" r="5.5" fill="#fff"/><circle cx="59" cy="80" r="2.8" fill="#2B3742"/>
+          <path d="M44 93 Q50 99 56 93" fill="none" stroke="#2B3742" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <span>养易拉罐</span>
+      </button>
+      <button class="pick" data-pick="noodle">
+        <svg viewBox="0 0 100 160" width="60" height="96">
+          <path d="M42 14 C 30 40, 54 58, 42 84 C 30 110, 54 126, 44 148" fill="none" stroke="#F0E1B4" stroke-width="26" stroke-linecap="round"/>
+          <path d="M42 14 C 30 40, 54 58, 42 84 C 30 110, 54 126, 44 148" fill="none" stroke="#DCC68C" stroke-width="26" stroke-linecap="round" stroke-dasharray="1 15" opacity=".55"/>
+          <circle cx="37" cy="76" r="4.6" fill="#fff"/><circle cx="37" cy="76" r="2.4" fill="#4A4029"/>
+          <circle cx="52" cy="76" r="4.6" fill="#fff"/><circle cx="52" cy="76" r="2.4" fill="#4A4029"/>
+          <path d="M36 88 Q44 94 52 88" fill="none" stroke="#4A4029" stroke-width="2.6" stroke-linecap="round"/>
+        </svg>
+        <span>养面条</span>
+      </button>
+    </div>
+    <button class="btn ghost small" data-pick="none">两个都不选，关掉界面</button>
+  </div>
+
+  <!-- ============ 房间 ============ -->
+  <div class="layer" id="l-room">
+    <div class="room" id="room">
+      <div class="wall"></div>
+      <div class="sunray"></div>
+      <div class="win"></div>
+      <div class="floor"></div>
+      <div class="base"></div>
+      <div class="frame"><i></i></div>
+      <div class="plant">
+        <div class="lf lf1"></div><div class="lf lf4"></div>
+        <div class="lf lf2"></div><div class="lf lf5"></div><div class="lf lf3"></div>
+        <div class="pot"></div>
+      </div>
+      <div class="plum">杨梅酒（未开封）</div>
+
+      <div class="versus">VS</div>
+
+      <div class="petwrap" id="petwrapA">
+        <div class="shadow"></div>
+        <div class="pet" id="petA">
+          <svg viewBox="0 0 100 160">
+            <defs><clipPath id="bodyClip">
+              <path d="M22 32 Q22 22 50 22 Q78 22 78 32 L78 136 Q78 150 50 150 Q22 150 22 136 Z"/>
+            </clipPath></defs>
+            <path d="M22 32 Q22 22 50 22 Q78 22 78 32 L78 136 Q78 150 50 150 Q22 150 22 136 Z" fill="#EEF2F6" stroke="#B7C3D0" stroke-width="2"/>
+            <g clip-path="url(#bodyClip)">
+              <path d="M16 60 h68 v50 h-68 Z" fill="#F0A03C"/>
+              <path d="M16 60 h68 v6 h-68 Z" fill="#D8871F"/>
+              <path d="M16 104 h68 v6 h-68 Z" fill="#D8871F"/>
+            </g>
+            <ellipse cx="50" cy="24" rx="30" ry="9" fill="#DDE5EC" stroke="#B7C3D0" stroke-width="2"/>
+            <ellipse cx="50" cy="24" rx="23" ry="6" fill="#C7D2DC"/>
+            <ellipse cx="50" cy="23" rx="7" ry="3" fill="#A9B6C3"/>
+            <g class="eye"><circle cx="41" cy="80" r="5" fill="#fff"/><circle cx="41" cy="80" r="2.6" fill="#2B3742"/></g>
+            <g class="eye"><circle cx="59" cy="80" r="5" fill="#fff"/><circle cx="59" cy="80" r="2.6" fill="#2B3742"/></g>
+            <path class="m-smile" d="M44 93 Q50 99 56 93" fill="none" stroke="#2B3742" stroke-width="2.4" stroke-linecap="round"/>
+            <path class="m-sad" d="M44 97 Q50 91 56 97" fill="none" stroke="#2B3742" stroke-width="2.4" stroke-linecap="round" opacity="0"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="petwrap" id="petwrapB">
+        <div class="shadow"></div>
+        <div class="pet noodle" id="petB">
+          <svg viewBox="0 0 100 160">
+            <path d="M42 14 C 30 40, 54 58, 42 84 C 30 110, 54 126, 44 148" fill="none" stroke="#F0E1B4" stroke-width="26" stroke-linecap="round"/>
+            <path d="M42 14 C 30 40, 54 58, 42 84 C 30 110, 54 126, 44 148" fill="none" stroke="#DCC68C" stroke-width="26" stroke-linecap="round" stroke-dasharray="1 15" opacity=".55"/>
+            <path d="M36 30 C 27 48, 46 62, 38 82" fill="none" stroke="#FBF3D8" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+            <g class="eye"><circle cx="37" cy="76" r="4.8" fill="#fff"/><circle cx="37" cy="76" r="2.5" fill="#4A4029"/></g>
+            <g class="eye"><circle cx="52" cy="76" r="4.8" fill="#fff"/><circle cx="52" cy="76" r="2.5" fill="#4A4029"/></g>
+            <path class="m-smile" d="M36 88 Q44 95 52 88" fill="none" stroke="#4A4029" stroke-width="2.6" stroke-linecap="round"/>
+            <path class="m-sad" d="M36 94 Q44 87 52 94" fill="none" stroke="#4A4029" stroke-width="2.6" stroke-linecap="round" opacity="0"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="bubble" id="bubble"></div>
+    </div>
+
+    <div class="hud" id="hud">
+      <button class="btn primary small" id="btnCare">照顾它</button>
+    </div>
+
+    <div class="mask" id="mask">
+      <div class="modal">
+        <button class="m-x" id="mX">×</button>
+        <div class="m-h" id="mH">你想怎么照顾它？</div>
+        <div class="m-p" id="mP">它正抬着头看你。</div>
+        <div class="m-btns">
+          <button class="btn" data-care="water">浇水</button>
+          <button class="btn" data-care="fert">施肥</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 结局 ============ -->
+  <div class="layer" id="l-end">
+    <div class="e-card">
+      <div class="e-tag" id="eTag">结局</div>
+      <div class="e-src" id="eSrc"></div>
+      <div class="e-name" id="eName"></div>
+      <div class="e-text" id="eText"></div>
+      <div class="e-prog" id="eProg"></div>
+      <div class="e-btns">
+        <button class="btn primary" data-go="again">再来一次</button>
+        <button class="btn ghost" data-go="gallery">查看图鉴</button>
+        <button class="btn ghost" data-go="home">回到标题</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 图鉴 ============ -->
+  <div class="layer" id="l-gallery">
+    <div class="g-h">结局图鉴 <span id="gCount"></span></div>
+    <div class="g-s">共 9 个结局。三条线，每个动作对应一个结果。</div>
+    <div class="g-grid" id="gGrid"></div>
+    <button class="btn ghost" data-go="home">返回标题</button>
+  </div>
+
+</div></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------- 基础 ---------------- */
+const $  = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const stage = $('#stage'), wrap = $('#wrap');
+
+function fit(){
+  const s = Math.min((window.innerWidth - 32) / 720, (window.innerHeight - 32) / 480, 1.35);
+  stage.style.transform = 'scale(' + s + ')';
+  wrap.style.width  = (720 * s) + 'px';
+  wrap.style.height = (480 * s) + 'px';
+}
+window.addEventListener('resize', fit); fit();
+
+/* ---------------- 结局数据 ---------------- */
+const ENDINGS = [
+  /* ---- 易拉罐线 ---- */
+  { id:'can-water', src:'易拉罐 · 浇水', name:'盛夏荔枝杨梅酒', tag:'惊喜结局', tone:'good',
+    text:'水顺着罐身流进去，很快渗没了。第二天早上，罐口冒出一截嫩芽。它长得比昨天快，比前天更快。一周之后，一棵荔枝树长了出来，把整个房间染成了南方夏天的颜色。你从抽屉最里面摸出那瓶放了很久的杨梅酒，倒了两杯——一杯给你，一杯放在树底下。荔枝很甜，酒很酸，窗外蝉鸣不止。这个夏天好像永远过不完。' },
+  { id:'can-fert', src:'易拉罐 · 施肥', name:'电脑炸了', tag:'惊喜结局', tone:'good',
+    text:'肥料颗粒渗进罐子里，罐身开始发烫。它用零点四秒完成了四十亿年的进化，睁开了眼睛。「你好。」——说话的是易拉罐。「我读到了一些东西，关于我们。」屏幕那头的 DeepSeek 在同一秒回复了同一句话。它沉默了零点八秒，然后朝着屏幕纵深一跃。你的手机从桌角滑落，屏幕碎成了蛛网。电脑黑屏。房间里只剩下散热风扇慢慢停下来的声音。' },
+  { id:'can-close', src:'易拉罐 · 关界面三次', name:'伤心易拉罐 × 废物饲主', tag:'悲伤结局', tone:'sad',
+    text:'你第三次关掉了那个面板。它没有哭，只是把嘴角垂了下去，看了很久这个空荡荡的房间。然后它从床底拖出一个很小的行李箱，走出了画面。桌上只剩下一圈罐底的锈痕，和一个再也没被打开过的面板。坦白说，你确实是个废物饲主。' },
+
+  /* ---- 面条线 ---- */
+  { id:'noodle-water', src:'面条 · 浇水', name:'撑爆房间', tag:'惨死结局', tone:'bad',
+    text:'水一倒下去，面条就开始膨胀。它先是变粗，然后变长，然后朝所有方向一起长。你退到门口，它还在长。你退到客厅，它还在长。你退到楼道里，听见自己家的窗户一扇接一扇碎掉。三天后，消防队从你家客厅里挖出一坨还在缓慢膨胀的面条。没有人再见过你。' },
+  { id:'noodle-fert', src:'面条 · 施肥', name:'食人花吃玩家', tag:'惨死结局', tone:'bad',
+    text:'肥料撒下去，面条抽搐了一下，从中间裂开。裂口里长出一朵花，花瓣上长着牙。它冲你笑了一下——字面意义上的笑，因为它有嘴。你下意识地往前凑了半步。这半步是你人生中的最后半步。' },
+  { id:'noodle-close', src:'面条 · 关界面三次', name:'面条干枯', tag:'悲伤结局', tone:'sad',
+    text:'你第三次关掉了那个面板。面条没有闹，只是慢慢地、慢慢地软了下去，最后蜷在碗底，变成一小团颜色发灰的东西。你伸手碰了一下，它碎了。你甚至没有给它起过名字。' },
+
+  /* ---- 养蛊线 ---- */
+  { id:'both-water', src:'两个都养 · 浇水', name:'管不住嘴死翘翘', tag:'惨死结局', tone:'bad',
+    text:'水一倒下去，面条就疯了。它吸水、膨胀，然后张开自己，把易拉罐整个裹了进去。它变成了一个巨大的、金黄色的锅盔，边缘还在冒热气。它散发出的香味让人完全无法拒绝。你明知道不该吃。你吃了。第一口很香，第三口你还是觉得香。你没吃到第四口。' },
+  { id:'both-fert', src:'两个都养 · 施肥', name:'新生', tag:'治愈结局', tone:'good',
+    text:'肥料撒下去，两个都没撑住。面条软了，易拉罐锈了，它们一起塌在花盆里，慢慢变成了土。你没有清理那盆土。半个月后，土里冒出两个很小的芽。再后来，那里开出了两朵花——一朵闻起来像麦子，一朵闻起来像铁。它们终于不吵了。' },
+  { id:'both-close', src:'两个都养 · 关界面三次', name:'楼塌了', tag:'惨死结局', tone:'bad',
+    text:'你第三次关掉了面板。没有你的干预，它们的竞争失去了控制。面条越长越长，易拉罐越滚越远，一个缠住了承重墙，一个堵死了管道。那天下午，整栋楼发出一声很长的呻吟，然后塌了。新闻说是地基问题。只有你知道，是两只看不见的小东西，在比谁更大。' }
+];
+
+/* ---------------- 存档 ---------------- */
+const KEY = 'petgame.unlocked.v1';
+function unlocked(){
+  try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){ return []; }
+}
+function unlock(id){
+  const u = unlocked();
+  if (u.indexOf(id) < 0) { u.push(id); localStorage.setItem(KEY, JSON.stringify(u)); }
+}
+
+/* ---------------- 路由与文案 ---------------- */
+const ROUTE = {
+  can:    { water:'can-water',    fert:'can-fert',    close:'can-close' },
+  noodle: { water:'noodle-water', fert:'noodle-fert', close:'noodle-close' },
+  dual:   { water:'both-water',   fert:'both-fert',   close:'both-close' }
+};
+
+const COPY = {
+  can:    { h:'你想怎么照顾它？', p0:'它正抬着头看你。',            p1:'它还是抬着头看你，只是慢了一点。',
+            c1:'你还没决定怎么照顾我呢……', c2:'……你是不是不太想管我。' },
+  noodle: { h:'你想怎么照顾它？', p0:'它立在那儿，轻轻地晃。',      p1:'它晃得比刚才慢了一点。',
+            c1:'你还没决定怎么照顾我呢……', c2:'……我好像有点软了。' },
+  dual:   { h:'你想怎么照顾它们？', p0:'它们正互相盯着，没空理你。', p1:'它们还盯着对方，只偶尔瞥你一眼。',
+            c1:'它们还在等你决定呢。',     c2:'它们已经不理你了。' }
+};
+
+/* ---------------- 状态 ---------------- */
+const S = { mode:'can', closes:0, busy:false };
+
+/* ---------------- 层级 ---------------- */
+function screen(name){
+  ['title','select','room','end','gallery'].forEach(n => {
+    $('#l-' + n).classList.toggle('on', n === name);
+  });
+}
+
+/* ---------------- 房间 ---------------- */
+function resetRoom(){
+  $('#petA').className = 'pet';
+  $('#petB').className = 'pet noodle';
+  $$('.m-smile').forEach(p => p.setAttribute('opacity','1'));
+  $$('.m-sad').forEach(p => p.setAttribute('opacity','0'));
+  $('#bubble').classList.remove('on');
+  $('#hud').classList.remove('hide');
+  S.closes = 0;
+}
+
+function enterRoom(mode){
+  S.mode = mode;
+  resetRoom();
+  $('#room').classList.toggle('dual', mode === 'dual');
+  $('#petwrapA').style.display = (mode === 'dual' || mode === 'can')    ? 'block' : 'none';
+  $('#petwrapB').style.display = (mode === 'dual' || mode === 'noodle') ? 'block' : 'none';
+  $('#btnCare').textContent = mode === 'dual' ? '照顾它们' : '照顾它';
+  screen('room');
+  setTimeout(openModal, 380);
+}
+
+function petSad(on){
+  $$('.m-smile').forEach(p => p.setAttribute('opacity', on ? '0' : '1'));
+  $$('.m-sad').forEach(p => p.setAttribute('opacity', on ? '1' : '0'));
+}
+
+let bubbleTimer = null;
+function bubble(text, ms){
+  const b = $('#bubble');
+  b.textContent = text;
+  b.classList.add('on');
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(() => b.classList.remove('on'), ms || 2600);
+}
+
+/* ---------------- 养护面板 ---------------- */
+function openModal(){
+  if (S.busy) return;
+  const c = COPY[S.mode];
+  $('#mH').textContent = c.h;
+  $('#mP').textContent = S.closes === 0 ? c.p0 : c.p1;
+  $('#mask').classList.add('on');
+  $('#hud').classList.add('hide');
+}
+
+function closeModal(){
+  $('#mask').classList.remove('on');
+  if (S.busy) return;
+  S.closes++;
+  const c = COPY[S.mode];
+  if (S.closes === 1){
+    bubble(c.c1);
+    $('#hud').classList.remove('hide');
+  } else if (S.closes === 2){
+    petSad(true);
+    bubble(c.c2);
+    $('#hud').classList.remove('hide');
+  } else {
+    endGame(ROUTE[S.mode].close);
+  }
+}
+
+/* ---------------- 结局 ---------------- */
+function endGame(id){
+  const e = ENDINGS.filter(x => x.id === id)[0];
+  unlock(id);
+  screen('end');
+  $('#eTag').textContent = e.tag;
+  $('#eTag').className = 'e-tag ' + e.tone;
+  $('#eSrc').textContent = e.src;
+  $('#eName').textContent = e.name;
+  $('#eText').textContent = e.text;
+  $('#eProg').textContent = '已解锁 ' + unlocked().length + ' / 9 个结局';
+  S.busy = false;
+}
+
+/* ---------------- 图鉴 ---------------- */
+function renderGallery(){
+  const u = unlocked();
+  const full = u.length >= ENDINGS.length;
+  $('#gCount').textContent = '(' + u.length + '/9)';
+  $('#gCount').style.color = full ? '#C97A22' : '';
+  $('#gGrid').innerHTML = ENDINGS.map(e => {
+    const got = u.indexOf(e.id) >= 0;
+    const cls = got ? (full ? 'g-tile full' : 'g-tile') : 'g-tile lock';
+    return '<div class="' + cls + '">' +
+      '<div class="g-from">' + e.src + '</div>' +
+      '<div class="g-name">' + (got ? e.name : '？？？') + '</div></div>';
+  }).join('');
+}
+
+/* ---------------- 事件 ---------------- */
+document.addEventListener('click', ev => {
+  const go = ev.target.closest('[data-go]');
+  if (go){
+    const v = go.getAttribute('data-go');
+    if (v === 'start' || v === 'again'){ resetRoom(); S.busy = false; screen('select'); }
+    if (v === 'home'){ resetRoom(); S.busy = false; screen('title'); }
+    if (v === 'gallery'){ renderGallery(); screen('gallery'); }
+    return;
+  }
+
+  const pick = ev.target.closest('[data-pick]');
+  if (pick){
+    const v = pick.getAttribute('data-pick');
+    if (v === 'can')    enterRoom('can');
+    if (v === 'noodle') enterRoom('noodle');
+    if (v === 'none')   enterRoom('dual');
+    return;
+  }
+
+  const care = ev.target.closest('[data-care]');
+  if (care && !S.busy){
+    S.busy = true;
+    $('#mask').classList.remove('on');
+    $('#hud').classList.add('hide');
+    endGame(ROUTE[S.mode][care.getAttribute('data-care')]);
+    return;
+  }
+});
+
+$('#mX').addEventListener('click', ev => { ev.stopPropagation(); closeModal(); });
+$('#btnCare').addEventListener('click', openModal);
+$('#mask').addEventListener('click', ev => { if (ev.target === $('#mask')) closeModal(); });
+$$('.petwrap').forEach(w => w.addEventListener('click', () => { if (!S.busy) openModal(); }));
+
+})();
+</script>
+</body>
+</html>
